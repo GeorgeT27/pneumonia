@@ -1,18 +1,25 @@
 #!/bin/bash
-exp_name="$1"
+exp_name="mimic192"
 run_cmd="python main.py \
     --exp_name=$exp_name \
-    --data_dir=../datasets/morphomnist \
-    --hps morphomnist \
-    --parents_x thickness intensity digit \
-    --context_dim=12 \
+    --data_dir=/workspace/causal-gen/pneumonia/ \
+    --csv_dir=/workspace/causal-gen/pneumonia/ \
+    --hps mimic192 \
+    --parents_x finding age sex race \
+    --context_dim=6 \
     --concat_pa \
     --lr=0.001 \
+    --epochs=500 \
     --bs=32 \
-    --wd=0.01 \
-    --beta=1 \
-    --cond_prior \
-    --eval_freq=4"
+    --wd=0.05 \
+    --beta=9 \
+    --x_like=diag_dgauss \
+    --z_max_res=96 \
+    --resume=/workspace/causal-gen/checkpoints/f_a_s_r/mimic192/checkpoint.pt \
+    --eval_freq=4" 
+
+
+
 
 # run_cmd="python main.py \
 #     --exp_name=$exp_name \

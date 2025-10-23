@@ -100,7 +100,7 @@ def add_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--resume", help="Path to load checkpoint.", type=str, default=""
     )
-    parser.add_argument("--seed", help="Set random seed.", type=int, default=7)
+    parser.add_argument("--seed", help="Set random seed.", type=int, default=42)
     parser.add_argument(
         "--deterministic",
         help="Toggle cudNN determinism.",
@@ -139,7 +139,7 @@ def add_arguments(parser: argparse.ArgumentParser):
         "--grad_clip", help="Gradient clipping value.", type=float, default=350
     )
     parser.add_argument(
-        "--grad_skip", help="Skip update grad norm threshold.", type=float, default=500
+        "--grad_skip", help="Skip update grad norm threshold.", type=float, default=1200
     )
     parser.add_argument(
         "--accu_steps", help="Gradient accumulation steps.", type=int, default=1

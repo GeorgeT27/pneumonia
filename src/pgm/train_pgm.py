@@ -416,7 +416,8 @@ if __name__ == "__main__":
 
         model = ColourMNISTPGM(args)
     else:
-        NotImplementedError
+        from flow_pgm import ChestPGM
+        model = ChestPGM(args)
     ema = EMA(model, beta=0.999)
     model.cuda()
     ema.cuda()

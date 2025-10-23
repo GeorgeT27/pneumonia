@@ -167,7 +167,7 @@ class ArgMaxGumbelMax(Transform):
         )
         return epsilons
 
-    def log_abs_det_jacobian(self, y):
+    def log_abs_det_jacobian(self, x, y):
         return -self._categorical.log_prob(y.squeeze(-1)).unsqueeze(-1)
 
 

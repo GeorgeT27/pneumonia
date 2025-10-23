@@ -73,7 +73,6 @@ class BasePGM(nn.Module):
     ) -> Dict[str, Tensor]:
         # NOTE: not ideal as "variables" is defined in child class
         dag_variables = self.variables.keys()
-        assert set(obs.keys()) == set(dag_variables)
         avg_cfs = {k: torch.zeros_like(obs[k]) for k in obs.keys()}
         batch_size = list(obs.values())[0].shape[0]
 

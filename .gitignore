@@ -2,3 +2,6 @@ datasets/mnist_digit_colour
 .vscode
 .mypy_cache
 *.pyc
+pneumonia
+/workspace/causal-gen/checkpoints/
+/workspace/causal-gen/imgs

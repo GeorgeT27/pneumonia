@@ -410,27 +410,21 @@ def read_mimic_from_df(
         data_dir (str): Path to the directory containing the preprocessed data.
 
     Returns:
-        Tuple[torch.Tensor, torch.Tensor]: Tuple containing the image and binary label.
-            label 0 represents no finding, 1 represents pleural effusion.
+        Tuple[Image.Image, torch.Tensor, MIMICMetadata]: Tuple containing the image, 
+            binary label, and metadata. label 0 represents no finding, 1 represents pleural effusion.
     """
-    img_path = os.path.join(data_dir, df.iloc[idx]["path_preproc"])
-    img = Image.open(img_path)  # .convert("RGB")
-    if df.iloc[idx]["disease"] == "Pleural Effusion":
-        label = torch.tensor(1)
-    elif df.iloc[idx]["disease"] == "No Finding":
-        label = torch.tensor(0)
-    else:
-        raise ValueError(
-            f"Invalid label {df.iloc[idx]['disease']}.",
-            "We expect either 'pleural_effusion' or 'no_finding'.",
-        )
+    try:
+        img_path = os.path.join(data_dir, df.iloc[idx]["path_preproc"])
+        img = Image.open(img_path).convert('F')  # .convert("RGB")
+        age = df.iloc[idx]["age"]
+        sex = df.iloc[idx]["sex_label"]
+        race = df.iloc[idx]["race_label"]
+        label = df.iloc[idx]['disease_label']
 
-    age = df.iloc[idx]["age"]
-    sex = df.iloc[idx]["sex_label"]
-    race = df.iloc[idx]["race_label"]
-
-    meta = MIMICMetadata(age=age, sex=sex, race=race)
-    return img, label, meta
+        meta = MIMICMetadata(age=age, sex=sex, race=race)
+        return img, label, meta
+    except Exception as e:
+        raise RuntimeError(f"Error loading image at index {idx}, path: {img_path if 'img_path' in locals() else 'unknown'}") from e
 
 
 class MIMIC(Dataset):
@@ -446,51 +440,60 @@ class MIMIC(Dataset):
         super().__init__()
         self.concat_pa = concat_pa
         self.parents_x = parents_x
-        split_df = pd.read_csv(split_path)
+        self.split_df = pd.read_csv(split_path)
         # remove rows whose disease label is neither No Finding nor Pleural Effusion
-        self.split_df = split_df[
-            (split_df["disease"] == "No Finding")
-            | (split_df["disease"] == "Pleural Effusion")
-        ].reset_index(drop=True)
-
         self.data_dir = data_dir
         self.cache = cache
         self.transform = transform
 
         if self.cache:
+            # Store processed tensors instead of PIL Images to avoid pickling issues
             self.imgs = []
             self.labels = []
             self.meta = []
+            print(f"Caching MIMIC dataset with {len(self.split_df)} samples...")
             for idx, _ in tqdm(
                 self.split_df.iterrows(), total=len(self.split_df), desc="Caching MIMIC"
             ):
                 assert isinstance(idx, int)
-                img, label, meta = read_mimic_from_df(idx, self.split_df, self.data_dir)
-                self.imgs.append(img)
-                self.labels.append(label)
-                self.meta.append(meta)
+                try:
+                    img, label, meta = read_mimic_from_df(idx, self.split_df, self.data_dir)
+                    # Convert PIL image to tensor immediately to avoid pickling issues
+                    if self.transform is not None:
+                        img = self.transform(img)
+                    self.imgs.append(img)
+                    self.labels.append(label)
+                    self.meta.append(meta)
+                except Exception as e:
+                    print(f"Warning: Failed to load sample at index {idx}: {e}")
+                    continue
 
     def __len__(self):
-        return len(self.split_df)
+        return len(self.split_df) if not self.cache else len(self.imgs)
 
     def __getitem__(self, idx: int) -> Dict[str, Tensor]:
-        if self.cache:
-            img = self.imgs[idx]
-            label = self.labels[idx]
-            meta = self.meta[idx]
-        else:
-            img, label, meta = read_mimic_from_df(idx, self.split_df, self.data_dir)
-        sample = {}
-        sample["x"] = self.transform(img)
-        sample["finding"] = label
-        sample.update(meta)
-        sample = preprocess_mimic(sample)
-        if self.concat_pa:
-            sample["pa"] = torch.cat(
-                [sample[k] for k in self.parents_x],
-                dim=0,
-            )
-        return sample
+        try:
+            if self.cache:
+                img = self.imgs[idx]
+                label = self.labels[idx]
+                meta = self.meta[idx]
+            else:
+                img, label, meta = read_mimic_from_df(idx, self.split_df, self.data_dir)
+                img = self.transform(img) if self.transform is not None else img
+            
+            sample = {}
+            sample["x"] = img if torch.is_tensor(img) else self.transform(img)
+            sample["finding"] = label
+            sample.update(meta)
+            sample = preprocess_mimic(sample)
+            if self.concat_pa:
+                sample["pa"] = torch.cat(
+                    [sample[k] for k in self.parents_x],
+                    dim=0,
+                )
+            return sample
+        except Exception as e:
+            raise RuntimeError(f"Error getting item at index {idx}") from e
 
 
 def preprocess_mimic(sample: Dict[str, Tensor]) -> Dict[str, Tensor]:

@@ -36,7 +36,7 @@ pgm_args = Hparams()
 pgm_args.update(pgm_checkpoint['hparams'])
 assert pgm_args.dataset == 'mimic'
 pgm = ChestPGM(pgm_args).cuda()
-pgm.load_state_dict(pgm_checkpoint['ema_model_state_dict'])
+pgm.load_state_dict(pgm_checkpoint['ema_model_state_dict']) 
 
 def load_vae(vae_path):
     print(f'\nLoading VAE checkpoint: {vae_path}')

@@ -4,9 +4,9 @@ parents='f_a_s_r'
 mkdir -p "../../checkpoints/$parents/$exp_name"
 
 # Model checkpoint paths
-predictor_path="../../checkpoints/$parents/aux_60k-aux/checkpoint.pt"
-pgm_path="../../checkpoints/$parents/pgm_60k-pgmg/checkpoint.pt"
-vae_path="../../checkpoints/$parents/mimic192/checkpoint.pt"
+predictor_path="/workspace/checkpoints/aux_60k-aux/checkpoint.pt"
+pgm_path="/workspace/checkpoints/pgm_60k-pgmg/checkpoint.pt"
+vae_path="/workspace/checkpoints/mimic192/checkpoint.pt"
 
 # Data directory
 data_dir="/workspace/causal-gen/pneumonia/"
@@ -17,7 +17,7 @@ run_cmd="python train_cf.py \
     --predictor_path=$predictor_path \
     --pgm_path=$pgm_path \
     --vae_path=$vae_path \
-    --epochs=5000 \
+    --epochs=50 \
     --bs=16 \
     --lr=1e-4 \
     --lr_lagrange=1e-2 \

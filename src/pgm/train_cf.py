@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import torch
 from dscm import DSCM
-from flow_pgm import FlowPGM
+from flow_pgm import FlowPGM, ChestPGM
 from layers import TraceStorage_ELBO
 from sklearn.metrics import roc_auc_score
 from torch import Tensor, nn
@@ -304,12 +304,12 @@ if __name__ == "__main__":
     predictor_checkpoint = torch.load(args.predictor_path)
     predictor_args = Hparams()
     predictor_args.update(predictor_checkpoint["hparams"])
-    predictor = FlowPGM(predictor_args).cuda()
+    predictor = ChestPGM(predictor_args).cuda()
     predictor.load_state_dict(predictor_checkpoint["ema_model_state_dict"])
 
     # for backwards compatibility
     if not hasattr(predictor_args, "dataset"):
-        predictor_args.dataset = "ukbb"
+        predictor_args.dataset = "mimic"
     if hasattr(predictor_args, "loss_norm"):
         args.loss_norm
 
@@ -337,12 +337,12 @@ if __name__ == "__main__":
     pgm_checkpoint = torch.load(args.pgm_path)
     pgm_args = Hparams()
     pgm_args.update(pgm_checkpoint["hparams"])
-    pgm = FlowPGM(pgm_args).cuda()
+    pgm = ChestPGM(pgm_args).cuda()
     pgm.load_state_dict(pgm_checkpoint["ema_model_state_dict"])
 
     # for backwards compatibility
     if not hasattr(pgm_args, "dataset"):
-        pgm_args.dataset = "ukbb"
+        pgm_args.dataset = "mimic"
     if args.data_dir != "":
         pgm_args.data_dir = args.data_dir
     dataloaders = setup_dataloaders(pgm_args)
@@ -359,14 +359,39 @@ if __name__ == "__main__":
     vae_args.update(vae_checkpoint["hparams"])
     if not hasattr(vae_args, "cond_prior"):  # for backwards compatibility
         vae_args.cond_prior = False
-    vae_args.kl_free_bits = vae_args.free_bits
+    # for backwards compatibility: old checkpoints may have used 'free_bits' instead of 'kl_free_bits'
+    if hasattr(vae_args, "free_bits"):
+        vae_args.kl_free_bits = vae_args.free_bits
+    elif not hasattr(vae_args, "kl_free_bits"):
+        vae_args.kl_free_bits = 0.0
     vae = HVAE(vae_args).cuda()
     vae.load_state_dict(vae_checkpoint["ema_model_state_dict"])
 
     # vae_args.data_dir = None  # adjust data_dir as needed
     if args.data_dir != "":
         vae_args.data_dir = args.data_dir
-    dataloaders = setup_dataloaders(vae_args)
+    # for backwards compatibility
+    if not hasattr(vae_args, "dataset"):
+        vae_args.dataset = "mimic"
+    
+    # Use pgm_args for setup_dataloaders (has 'setup' attribute), but ensure it has VAE-specific attributes
+    # Copy missing VAE-specific attributes from vae_args to pgm_args
+    if hasattr(vae_args, "input_res") and not hasattr(pgm_args, "input_res"):
+        pgm_args.input_res = vae_args.input_res
+    if hasattr(vae_args, "input_channels") and not hasattr(pgm_args, "input_channels"):
+        pgm_args.input_channels = vae_args.input_channels
+    if hasattr(vae_args, "pad") and not hasattr(pgm_args, "pad"):
+        pgm_args.pad = vae_args.pad
+    if hasattr(vae_args, "parents_x") and not hasattr(pgm_args, "parents_x"):
+        pgm_args.parents_x = vae_args.parents_x
+    # Ensure pgm_args has dataset attribute
+    if not hasattr(pgm_args, "dataset"):
+        pgm_args.dataset = vae_args.dataset if hasattr(vae_args, "dataset") else "mimic"
+    # Ensure pgm_args has data_dir (use vae_args if set, otherwise keep pgm_args)
+    if hasattr(vae_args, "data_dir") and vae_args.data_dir:
+        pgm_args.data_dir = vae_args.data_dir
+    
+    dataloaders = setup_dataloaders(pgm_args)
 
     @torch.no_grad()
     def vae_epoch(args, vae, dataloader):
@@ -411,8 +436,11 @@ if __name__ == "__main__":
     args.betas = vae_args.betas
 
     # init model
-    if not hasattr(vae_args, "dataset"):
-        args.dataset = "ukbb"
+    # Ensure args has dataset attribute (needed by DSCM.vae_preprocess)
+    if hasattr(vae_args, "dataset"):
+        args.dataset = vae_args.dataset
+    elif not hasattr(args, "dataset"):
+        args.dataset = "mimic"
     model = DSCM(args, pgm, predictor, vae)
     ema = EMA(model, beta=args.ema_rate)
     model.cuda()

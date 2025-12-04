@@ -233,7 +233,7 @@ class ResNet18(nn.Module):
         self.fc = nn.Linear(base_model.fc.in_features + context_dim, num_outputs)
 
     def forward(self, x, y=None):
-        x = self.resnet(x).squeeze()
+        x = self.resnet(x).flatten(1)
         if y is not None:
             x = torch.cat([x, y], dim=-1)
         return self.fc(x)

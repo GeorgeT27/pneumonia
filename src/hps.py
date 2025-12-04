@@ -93,6 +93,7 @@ def setup_hparams(parser: argparse.ArgumentParser) -> Hparams:
 
 def add_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--exp_name", help="Experiment name.", type=str, default="")
+    parser.add_argument("--dataset", help="Dataset name.", type=str, default="mimic")
     parser.add_argument(
         "--data_dir", help="Data directory to load form.", type=str, default=""
     )
